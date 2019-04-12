@@ -5,3 +5,7 @@ Various shell scripts to ease OpenShift admin tasks and etc. You may need to run
 # createPV.sh
 
 This script creates PV and NFS for OpenShift. Mainly used for demo environment preparation. Run createPV.sh or createPV.sh -h to find out how to use this sceript.
+
+# configure_nexus3_repo.sh
+
+Script to configure Nexus repos for redhat-ga, jboss, maven-central,maven-releases,maven-snapshots, maven-all-public. It also added a releases repo to store build releases, if you wish to keep your releases in Nexus

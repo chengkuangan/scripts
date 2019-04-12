@@ -12,4 +12,4 @@ Script to configure Nexus repos for redhat-ga, jboss, maven-central,maven-releas
 
 # initGogs.sh
 
-Script to download source files from one git and commit the source files into another git. Strictly created to setup demo environment. 
+Script to download source files from one git and commit the source files into another git. Strictly created to setup demo environment. Run initGogs.sh or initGogs.sh -h to view the usage information.

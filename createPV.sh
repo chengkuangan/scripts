@@ -23,7 +23,7 @@ SSH_COMMAND=""
 
 function printUsage(){
     echo
-    echo "This script helps to create NFS shared storage and PV in the OCP Master Node."
+    echo "This script helps to create NFS volume and PV for OCP environment."
     echo "You can also use this script to create NFS without creating PV."
     echo "If you are creating NFS on remote NFS server, it is required to use the passwordless "
     echo "public key login or use a key file."

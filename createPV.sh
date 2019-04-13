@@ -5,10 +5,11 @@ PASSWORD=""
 MASTER_URL=""
 PV_SIZE="1Gi"
 NFS_PATH="/exports"
-NFS_PATH_PREFIX="vol-"
+#NFS_PATH_PREFIX="vol-"
 NFS_VOL_NUMBER="30"
 NFS_EXPORT_FILE_LOCATION="/etc/exports.d"
 NFS_EXPORT_FILE_NAME=""
+NFS_VOLUME_NAME="myvolume"
 NFS_SERVER=""
 PV_ACCESS_MODE="ReadWriteOnce"        #ReadOnlyMany, ReadWriteMany, ReadWriteOnce
 PV_RECLAIM_POLICY="Recycle"
@@ -48,7 +49,8 @@ function printUsage(){
     echo "--ssh-keyfile     SSH Key File. Default:$SSH_KEYFILE"
     echo "-s    PV size. e.g. 1Gi, 512Mi Default:$PV_SIZE"
     echo "--nfs-path    NFS PATH to create the volume. This path will be created if not exists. Default: $NFS_PATH"
-    echo "--nfs-path-prefix    NFS PATH Prefix to create the shared volume. Default: $NFS_PATH_PREFIX"
+#    echo "--nfs-path-prefix    NFS PATH Prefix to create the shared volume. Default: $NFS_PATH_PREFIX"
+    echo "--nfs-vol-name    NFS VOLUME NAME to be created. Default: $NFS_VOLUME_NAME"
     echo "--nfs-vol-no    Number of NFS Volume to create. Default: $NFS_VOL_NUMBER"
     echo "--nfs-export-filepath    Default path to create export file. Default: $NFS_EXPORT_FILE_LOCATION"
     echo "--pv-access-mode    PV Access Mode. Default:$PV_ACCESS_MODE. Possible values: ReadOnlyMany, ReadWriteMany, ReadWriteOnce"
@@ -58,6 +60,7 @@ function printUsage(){
     echo "--simulate    Simulate without doing anything. Default:$SIMULATE_MODE"
     echo
 }
+
 
 function printVariables(){
     echo
@@ -70,8 +73,9 @@ function printVariables(){
     echo "PV_SIZE = $PV_SIZE"
     echo "NFS_SERVER = $NFS_SERVER"
     echo "NFS_PATH = $NFS_PATH"
-    echo "NFS_PATH_PREFIX = $NFS_PATH_PREFIX"
+#    echo "NFS_PATH_PREFIX = $NFS_PATH_PREFIX"
     echo "NFS_VOL_NUMBER = $NFS_VOL_NUMBER"
+    echo "NFS_VOLUME_NAME = $NFS_VOLUME_NAME"
     echo "NFS_EXPORT_FILE_LOCATION = $NFS_EXPORT_FILE_LOCATION"
     echo "NFS_EXPORT_FILE_NAME = $NFS_EXPORT_FILE_NAME"
     echo "PV_ACCESS_MODE = $PV_ACCESS_MODE"
@@ -90,7 +94,7 @@ function printVariables(){
 function validation(){
 
 	if [[ $(fgrep -ix $SKIP_PV <<< "no") ]]; then 
-		if [ "$MASTER_URL" != "" ] || [ "$USERNAME" != "" ] || [ "$PASSWORD" != "" ]; then
+		if [ "$MASTER_URL" == "" ] || [ "$USERNAME" == "" ] || [ "$PASSWORD" == "" ]; then
 			echo "Error: Missing parameter -url, -u or -p. You enter --skip-pv $SKIP_PV. -url, -u or -p is mandatory."
 			echo
 			exit 0
@@ -145,10 +149,13 @@ function processArguments(){
       elif [ "$1" == "--nfs-path" ]; then
         shift
         NFS_PATH="$1"
-      elif [ "$1" == "--nfs-path-prefix" ]; then
+#      elif [ "$1" == "--nfs-path-prefix" ]; then
+#        shift
+#        NFS_PATH_PREFIX="$1"
+      elif [ "$1" == "--nfs-vol-name" ]; then
         shift
-        NFS_PATH_PREFIX="$1"
-      elif [ "$1" == "--nfs-vol-no" ]; then
+        NFS_VOLUME_NAME="$1"
+elif [ "$1" == "--nfs-vol-no" ]; then
         shift
         NFS_VOL_NUMBER="$1"
       elif [ "$1" == "--nfs-export-filepath" ]; then
@@ -200,8 +207,8 @@ function createNFS(){
     while [ $dirCount -lt $NFS_VOL_NUMBER ]
     do
        dirCount=`expr $dirCount + 1`
-       pathToCreate="$NFS_PATH/$NFS_PATH_PREFIX$dirCount"
-       echo "Creating directory: $pathToCreate"
+       pathToCreate="$NFS_PATH/$NFS_VOLUME_NAME$dirCount"
+       echo "Creating file: $pathToCreate"
        if [[ $(fgrep -ix $IS_NFS_SERVER_REMOTE <<< "yes") ]] ; then
           if [[ $(fgrep -ix $SIMULATE_MODE <<< "yes") ]]; then
              printf "$SSH_COMMAND \"mkdir $pathToCreate && chown nfsnobody:nfsnobody $pathToCreate && chmod 777 $pathToCreate && echo '$pathToCreate *(rw,root_squash)' >> $NFS_EXPORT_FILE_LOCATION/$NFS_EXPORT_FILE_NAME\"\n"
@@ -242,19 +249,19 @@ function sshcommand(){
 
 function createPV(){
     dirCount=0
-
+    TEMP_DIR="$NFS_VOLUME_NAME"
+    echo "Creating temp directory $TEMP_DIR"
+    mkdir $TEMP_DIR
+    
     while [ $dirCount -lt $NFS_VOL_NUMBER ]
     do
        dirCount=`expr $dirCount + 1`
-       pvString="{\"apiVersion\": \"v1\",\"kind\": \"PersistentVolume\",\"metadata\":{\"name\": \"$NFS_PATH_PREFIX$dirCount-volume\",\"label\": {\"name\": \"$NFS_PATH_PREFIX$dirCount-volume\"}},\"spec\":{\"capacity\": {\"storage\": \"$PV_SIZE\"},\"accessModes\": [ \"$PV_ACCESS_MODE\" ],\"nfs\": {\"path\": \"$NFS_PATH/$NFS_PATH_PREFIX$dirCount\",\"server\": \"$NFS_SERVER\"}, \"persistentVolumeReclaimPolicy\": \"$PV_RECLAIM_POLICY\"}}"
-       if [[ $(fgrep -ix $IS_NFS_SERVER_REMOTE <<< "yes") ]] ; then
-          echo "$pvString > ./$7$dirCount-volume.json"
-       else
-          echo $pvString > ./$7$dirCount-volume.json
-       fi
+       pvString="{\"apiVersion\": \"v1\",\"kind\": \"PersistentVolume\",\"metadata\":{\"name\": \"$NFS_VOLUME_NAME$dirCount-volume\",\"label\": {\"name\": \"$NFS_VOLUME_NAME$dirCount\"}},\"spec\":{\"capacity\": {\"storage\": \"$PV_SIZE\"},\"accessModes\": [ \"$PV_ACCESS_MODE\" ],\"nfs\": {\"path\": \"$NFS_PATH/$NFS_VOLUME_NAME$dirCount\",\"server\": \"$NFS_SERVER\"}, \"persistentVolumeReclaimPolicy\": \"$PV_RECLAIM_POLICY\"}}"
+       echo $pvString > $TEMP_DIR/$7$NFS_VOLUME_NAME$dirCount.json
     done
 
-    TEMP_FILES="./*.json"
+    TEMP_FILES="$TEMP_DIR/*.json"
+	
     if [[ $(fgrep -ix $IS_NFS_SERVER_REMOTE <<< "yes") ]] ; then
        echo "oc login --username=$USERNAME --password=$PASSWORD $MASTER_URL"
     else
@@ -264,25 +271,25 @@ function createPV(){
     sleep 10
 
     for entry in $TEMP_FILES
-    do
-      echo "Using file: $entry"
-      if [[ $(fgrep -ix $IS_NFS_SERVER_REMOTE <<< "yes") ]] ; then
-         echo "oc create -f $entry"
-      else
-         oc create -f $entry
-      fi
-    done
+       do
+         echo "Using file: $entry"
+         if [[ $(fgrep -ix $IS_NFS_SERVER_REMOTE <<< "yes") ]] ; then
+            echo "oc create -f $entry"
+         else
+            oc create -f $entry
+         fi
+       done
     echo
     echo
     if [[ $(fgrep -ix $IS_NFS_SERVER_REMOTE <<< "yes") ]] ; then
         echo "oc get pv"
         echo "oc logout"
-        echo "rm $TEMP_FILES"
     else
         oc get pv
         oc logout
-        rm $TEMP_FILES
     fi
+	echo "Removing temporary directory $TEMP_DIR"
+	rm -rf $TEMP_DIR
     echo
     echo
     

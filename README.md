@@ -4,7 +4,7 @@ Various shell scripts to ease OpenShift admin tasks and etc. You may need to run
 
 # createPV.sh
 
-This script creates PV and NFS for OpenShift. Mainly used for demo environment preparation. Run createPV.sh or createPV.sh -h to find out how to use this sceript.
+This script creates PV and NFS for OpenShift. Mainly used for demo environment preparation. Run createPV.sh or createPV.sh -h to find out how to use this script.
 
 # configure_nexus3_repo.sh
 

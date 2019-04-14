@@ -21,6 +21,8 @@ IS_NFS_SERVER_REMOTE="Yes"
 SKIP_PV="No"
 SIMULATE_MODE="no"
 SSH_COMMAND=""
+SSH_SUDO="yes"
+SSH_SUDO_COMMAND=""
 
 function printUsage(){
     echo
@@ -47,6 +49,7 @@ function printUsage(){
     echo "--ssh-username     SSH Username. Default:$SSH_USERNAME"
 #    echo "--ssh-password     SSH Password. Default: $SSH_PASSWORD"
     echo "--ssh-keyfile     SSH Key File. Default:$SSH_KEYFILE"
+    echo "--ssh-sudo     Default:$SSH_SUDO. Enable sudo to run command for ssh"
     echo "-s    PV size. e.g. 1Gi, 512Mi Default:$PV_SIZE"
     echo "--nfs-path    NFS PATH to create the volume. This path will be created if not exists. Default: $NFS_PATH"
 #    echo "--nfs-path-prefix    NFS PATH Prefix to create the shared volume. Default: $NFS_PATH_PREFIX"
@@ -87,6 +90,7 @@ function printVariables(){
     echo "IS_NFS_SERVER_REMOTE = $IS_NFS_SERVER_REMOTE"
     echo "SKIP_PV = $SKIP_PV"
     echo "SIMULATE_MODE = $SIMULATE_MODE"
+    echo "SSH_SUDO = $SSH_SUDO"
     echo
 	
 }
@@ -155,7 +159,7 @@ function processArguments(){
       elif [ "$1" == "--nfs-vol-name" ]; then
         shift
         NFS_VOLUME_NAME="$1"
-elif [ "$1" == "--nfs-vol-no" ]; then
+      elif [ "$1" == "--nfs-vol-no" ]; then
         shift
         NFS_VOL_NUMBER="$1"
       elif [ "$1" == "--nfs-export-filepath" ]; then
@@ -167,6 +171,12 @@ elif [ "$1" == "--nfs-vol-no" ]; then
       elif [ "$1" == "--ssh-username" ]; then
         shift
         SSH_USERNAME="$1"
+      elif [ "$1" == "--ssh-sudo" ]; then
+        shift
+        SSH_SUDO="$1"
+        if [[ $(fgrep -ix $SSH_SUDO <<< "yes") ]]; then
+            SSH_SUDO_COMMAND="sudo"
+        fi
       elif [ "$1" == "--pv-access-mode" ]; then
         shift
         PV_ACCESS_MODE="$1"
@@ -195,15 +205,15 @@ function createNFS(){
 
     dirCount=0
 
-    if [ ! -d "$NFS_PATH" ]; then
-        echo "Path $NFS_PATH not exists. Creating export path: $NFS_PATH"
-        if [[ $(fgrep -ix $SIMULATE_MODE <<< "yes") ]]; then
-            echo "mkdir $NFS_PATH"
-        else
-            mkdir $NFS_PATH
-        fi
+    echo "Creating export path: $NFS_PATH if it is not exists."
+    if [[ $(fgrep -ix $SIMULATE_MODE <<< "yes") ]]; then
+        echo "mkdir $NFS_PATH"
+    else
+        $SSH_COMMAND "$SSH_SUDO_COMMAND mkdir -p $NFS_PATH"
     fi
-
+    
+    sudo touch /tmp/$NFS_EXPORT_FILE_NAME
+	
     while [ $dirCount -lt $NFS_VOL_NUMBER ]
     do
        dirCount=`expr $dirCount + 1`
@@ -211,29 +221,33 @@ function createNFS(){
        echo "Creating file: $pathToCreate"
        if [[ $(fgrep -ix $IS_NFS_SERVER_REMOTE <<< "yes") ]] ; then
           if [[ $(fgrep -ix $SIMULATE_MODE <<< "yes") ]]; then
-             printf "$SSH_COMMAND \"mkdir $pathToCreate && chown nfsnobody:nfsnobody $pathToCreate && chmod 777 $pathToCreate && echo '$pathToCreate *(rw,root_squash)' >> $NFS_EXPORT_FILE_LOCATION/$NFS_EXPORT_FILE_NAME\"\n"
+             printf "$SSH_COMMAND \"$SSH_SUDO_COMMAND mkdir $pathToCreate && $SSH_SUDO_COMMAND chown nfsnobody:nfsnobody $pathToCreate && $SSH_SUDO_COMMAND chmod 777 $pathToCreate && $SSH_SUDO_COMMAND echo '$pathToCreate *(rw,root_squash)' >> $NFS_EXPORT_FILE_LOCATION/$NFS_EXPORT_FILE_NAME\"\n"
           else
-             $SSH_COMMAND "mkdir $pathToCreate &&  chown nfsnobody:nfsnobody $pathToCreate && chmod 777 $pathToCreate && echo '$pathToCreate *(rw,root_squash)' >> $NFS_EXPORT_FILE_LOCATION/$NFS_EXPORT_FILE_NAME"
+              $SSH_COMMAND "$SSH_SUDO_COMMAND mkdir $pathToCreate && $SSH_SUDO_COMMAND chown nfsnobody:nfsnobody $pathToCreate && $SSH_SUDO_COMMAND chmod 777 $pathToCreate && $SSH_SUDO_COMMAND echo '$pathToCreate *(rw,root_squash)' >> /tmp/$NFS_EXPORT_FILE_NAME"
           fi
-#          ssh $SSH_USERNAME@$NFS_SERVER -p $SSH_PORT "mkdir $pathToCreate &&  chown nfsnobody:nfsnobody $pathToCreate && chmod 777 $pathToCreate && echo '$pathToCreate *(rw,root_squash)' >> $NFS_EXPORT_FILE_LOCATION/$NFS_EXPORT_FILE_NAME"
        else
           if [[ $(fgrep -ix $SIMULATE_MODE <<< "yes") ]]; then
-             printf "mkdir $pathToCreate && chown nfsnobody:nfsnobody $pathToCreate && chmod 777 $pathToCreate && echo \"$pathToCreate *(rw,root_squash)\" >> $NFS_EXPORT_FILE_LOCATION/$NFS_EXPORT_FILE_NAME\n"
+             printf "$SSH_SUDO_COMMAND mkdir $pathToCreate && $SSH_SUDO_COMMAND chown nfsnobody:nfsnobody $pathToCreate && $SSH_SUDO_COMMAND chmod 777 $pathToCreate && $SSH_SUDO_COMMAND echo \"$pathToCreate *(rw,root_squash)\" >> $NFS_EXPORT_FILE_LOCATION/$NFS_EXPORT_FILE_NAME\n"
           else
-             mkdir $pathToCreate && chown nfsnobody:nfsnobody $pathToCreate && chmod 777 $pathToCreate && echo "$pathToCreate *(rw,root_squash)" >> $NFS_EXPORT_FILE_LOCATION/$NFS_EXPORT_FILE_NAME
+             $SSH_SUDO_COMMAND mkdir $pathToCreate && $SSH_SUDO_COMMAND chown nfsnobody:nfsnobody $pathToCreate && $SSH_SUDO_COMMAND chmod 777 $pathToCreate && $SSH_SUDO_COMMAND echo "$pathToCreate *(rw,root_squash)" >> $NFS_EXPORT_FILE_LOCATION/$NFS_EXPORT_FILE_NAME
           fi
        fi
     done
+        echo "Copying /tmp/$NFS_EXPORT_FILE_NAME to $NFS_EXPORT_FILE_LOCATION/$NFS_EXPORT_FILE_NAME"
+        $SSH_COMMAND "$SSH_SUDO_COMMAND cp /tmp/$NFS_EXPORT_FILE_NAME $NFS_EXPORT_FILE_LOCATION/$NFS_EXPORT_FILE_NAME"
     echo
     echo "Results: "
     echo
     if [[ $(fgrep -ix $SIMULATE_MODE <<< "yes") ]]; then
-       printf "$SSH_COMMAND \"exportfs -a\"\n"
-       printf "$SSH_COMMAND \"showmount -e\"\n"
+       printf "$SSH_COMMAND \"$SSH_SUDO_COMMAND exportfs -a\"\n"
+       printf "$SSH_COMMAND \"$SSH_SUDO_COMMAND showmount -e\"\n"
     else
-       ssh $SSH_COMMAND "exportfs -a"
-       ssh $SSH_COMMAND "showmount -e"
+       $SSH_COMMAND "$SSH_SUDO_COMMAND exportfs -a"
+       $SSH_COMMAND "$SSH_SUDO_COMMAND showmount -e"
     fi
+    
+    $SSH_COMMAND "rm /tmp/$NFS_EXPORT_FILE_NAME"
+	
     echo
 }
 
@@ -262,7 +276,7 @@ function createPV(){
 
     TEMP_FILES="$TEMP_DIR/*.json"
 	
-    if [[ $(fgrep -ix $IS_NFS_SERVER_REMOTE <<< "yes") ]] ; then
+    if [[ $(fgrep -ix $SIMULATE_MODE <<< "yes") ]] ; then
        echo "oc login --username=$USERNAME --password=$PASSWORD $MASTER_URL"
     else
        oc login --username=$USERNAME --password=$PASSWORD $MASTER_URL
@@ -273,7 +287,7 @@ function createPV(){
     for entry in $TEMP_FILES
        do
          echo "Using file: $entry"
-         if [[ $(fgrep -ix $IS_NFS_SERVER_REMOTE <<< "yes") ]] ; then
+         if [[ $(fgrep -ix $SIMULATE_MODE <<< "yes") ]] ; then
             echo "oc create -f $entry"
          else
             oc create -f $entry
@@ -281,7 +295,7 @@ function createPV(){
        done
     echo
     echo
-    if [[ $(fgrep -ix $IS_NFS_SERVER_REMOTE <<< "yes") ]] ; then
+    if [[ $(fgrep -ix $SIMULATE_MODE <<< "yes") ]] ; then
         echo "oc get pv"
         echo "oc logout"
     else
@@ -301,6 +315,11 @@ printVariables
 validation
 sshcommand
 createNFS
+
+echo "Everything OK so far?"
+echo "Press ENTER (OR Ctrl-C to cancel) to proceed..."
+read bc
+
 if [[ $(fgrep -ix $SKIP_PV <<< "no") ]]; then
     createPV
 fi 

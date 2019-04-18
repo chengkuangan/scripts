@@ -227,9 +227,9 @@ function createNFS(){
           fi
        else
           if [[ $(fgrep -ix $SIMULATE_MODE <<< "yes") ]]; then
-             printf "$SSH_SUDO_COMMAND mkdir $pathToCreate && $SSH_SUDO_COMMAND chown nfsnobody:nfsnobody $pathToCreate && $SSH_SUDO_COMMAND chmod 777 $pathToCreate && $SSH_SUDO_COMMAND echo \"$pathToCreate *(rw,root_squash)\" >> $NFS_EXPORT_FILE_LOCATION/$NFS_EXPORT_FILE_NAME\n"
+             printf "$SSH_SUDO_COMMAND mkdir $pathToCreate && $SSH_SUDO_COMMAND chown nfsnobody:nfsnobody $pathToCreate && $SSH_SUDO_COMMAND chmod 777 $pathToCreate && $SSH_SUDO_COMMAND echo \"$pathToCreate *(rw,root_squash)\" >> /tmp/$NFS_EXPORT_FILE_NAME\n"
           else
-             $SSH_SUDO_COMMAND mkdir $pathToCreate && $SSH_SUDO_COMMAND chown nfsnobody:nfsnobody $pathToCreate && $SSH_SUDO_COMMAND chmod 777 $pathToCreate && $SSH_SUDO_COMMAND echo "$pathToCreate *(rw,root_squash)" >> $NFS_EXPORT_FILE_LOCATION/$NFS_EXPORT_FILE_NAME
+             $SSH_SUDO_COMMAND mkdir $pathToCreate && $SSH_SUDO_COMMAND chown nfsnobody:nfsnobody $pathToCreate && $SSH_SUDO_COMMAND chmod 777 $pathToCreate && $SSH_SUDO_COMMAND echo "$pathToCreate *(rw,root_squash)" >> /tmp/$NFS_EXPORT_FILE_NAME
           fi
        fi
     done
